@@ -16,7 +16,7 @@ final_fct_events as (
         e.event_id,
         {{ generate_surrogate_key(['e.user_id']) }} as user_key,
         e.user_id,
-        cast(strftime(e.event_date, '%Y%m%d') as integer) as date_key,
+        {{ date_to_key('e.event_date') }} as date_key,
         e.event_title,
         e.event_body,
         e.event_timestamp,
