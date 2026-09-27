@@ -1,0 +1,36 @@
+name: CD Pipeline (Deployment Checks)
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy-validation:
+    name: Production Deployment Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install dbt-core dbt-snowflake
+
+      - name: Parse & Validate dbt Manifest
+        env:
+          DBT_PROFILES_DIR: ${{ github.workspace }}/dbt_project
+        run: |
+          cd dbt_project
+          dbt parse --target dev
+          echo "dbt manifest parsed successfully. Artifacts ready for deployment."
+
+      - name: Notify Deployment Status
+        if: always()
+        run: |
+          echo "CD Workflow finished with status: ${{ job.status }}"

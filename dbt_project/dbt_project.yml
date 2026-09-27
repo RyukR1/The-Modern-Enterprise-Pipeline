@@ -1,0 +1,29 @@
+name: 'enterprise_mds'
+version: '1.0.0'
+config-version: 2
+
+profile: 'enterprise_mds'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  enterprise_mds:
+    staging:
+      +materialized: view
+      +schema: BRONZE
+    intermediate:
+      +materialized: view
+      +schema: SILVER
+    marts:
+      +schema: GOLD
+      core:
+        +materialized: table

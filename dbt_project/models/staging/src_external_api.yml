@@ -1,0 +1,23 @@
+version: 2
+
+sources:
+  - name: raw_api
+    description: "Raw payloads extracted from external REST APIs and loaded into raw stage."
+    database: RAW_DB
+    schema: BRONZE
+    tables:
+      - name: raw_events
+        description: "Raw events JSON table."
+        columns:
+          - name: raw_payload
+            description: "JSON variant column holding event payload."
+          - name: ingested_at
+            description: "Timestamp when record was copied into raw stage."
+
+      - name: raw_users
+        description: "Raw users JSON table."
+        columns:
+          - name: raw_payload
+            description: "JSON variant column holding user payload."
+          - name: ingested_at
+            description: "Timestamp when record was copied into raw stage."

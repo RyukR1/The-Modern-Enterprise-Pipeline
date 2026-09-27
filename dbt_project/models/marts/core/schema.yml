@@ -1,0 +1,64 @@
+version: 2
+
+models:
+  - name: dim_users
+    description: "Dimension table containing current user profiles and aggregate activity metrics."
+    columns:
+      - name: user_key
+        description: "Surrogate primary key for user dimension."
+        tests:
+          - unique
+          - not_null
+      - name: user_id
+        description: "Natural user identifier from source API."
+        tests:
+          - not_null
+      - name: email
+        description: "User email address."
+
+  - name: dim_dates
+    description: "Date dimension table for time-based analytical slicing."
+    columns:
+      - name: date_key
+        description: "Surrogate key represented as YYYYMMDD integer."
+        tests:
+          - unique
+          - not_null
+      - name: date_day
+        description: "Calendar date."
+        tests:
+          - not_null
+
+  - name: dim_repositories
+    description: "Dimension table containing repository metrics and contributor counts."
+    columns:
+      - name: repo_key
+        description: "Surrogate primary key for repository dimension."
+        tests:
+          - unique
+          - not_null
+      - name: repo_name
+        description: "Name of repository."
+        tests:
+          - not_null
+
+  - name: fct_events
+    description: "Incremental Fact table containing atomic event activities."
+
+    columns:
+      - name: event_key
+        description: "Surrogate key for the event record."
+        tests:
+          - unique
+          - not_null
+      - name: event_id
+        description: "Natural event ID."
+        tests:
+          - not_null
+      - name: user_key
+        description: "Foreign key reference to dim_users."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_users')
+              field: user_key

@@ -1,0 +1,20 @@
+enterprise_mds:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "/tmp/mds_dev.duckdb"
+      schema: main
+      threads: 4
+
+    snowflake_prod:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT', 'xy12345.us-east-1') }}"
+      user: "{{ env_var('SNOWFLAKE_USER', 'DBT_USER') }}"
+      password: "{{ env_var('SNOWFLAKE_PASSWORD', 'SecretPass123!') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE', 'DATA_ENGINEER') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE', 'ANALYTICS_DB') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE', 'TRANSFORM_WH') }}"
+      schema: "{{ env_var('SNOWFLAKE_SCHEMA', 'PUBLIC') }}"
+      threads: 8
+      client_session_keep_alive: False
