@@ -4,12 +4,12 @@ with source_data as (
 
 parsed_events as (
     select
-        cast(raw_payload:id as varchar) as event_id,
-        cast(raw_payload:userId as varchar) as user_id,
-        cast(raw_payload:title as varchar) as event_title,
-        cast(raw_payload:body as varchar) as event_body,
+        cast({{ json_extract('raw_payload', 'id') }} as varchar) as event_id,
+        cast({{ json_extract('raw_payload', 'userId') }} as varchar) as user_id,
+        cast({{ json_extract('raw_payload', 'title') }} as varchar) as event_title,
+        cast({{ json_extract('raw_payload', 'body') }} as varchar) as event_body,
         coalesce(
-            cast(raw_payload:created_at as timestamp),
+            cast({{ json_extract('raw_payload', 'created_at') }} as timestamp),
             ingested_at
         ) as event_timestamp,
         {{ insert_audit_metadata() }}
