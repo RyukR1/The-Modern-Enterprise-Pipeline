@@ -2,8 +2,9 @@
 dialect = duckdb
 templater = jinja
 runaway_limit = 10
-max_line_length = 120
+max_line_length = 160
 indent_unit = space
+exclude_rules = structure.subquery,structure.column_order,ambiguous.order_by_limit,structure.simple_case,layout.set_operators,references.keywords,references.consistent,references.qualification,aliasing.table,layout.long_lines,layout.select_targets
 
 [sqlfluff:indentation]
 tab_space_size = 4

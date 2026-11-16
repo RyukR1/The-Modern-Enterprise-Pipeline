@@ -19,12 +19,12 @@ provider "snowflake" {
 # WAREHOUSE CONFIGURATION
 # ---------------------------------------------------------------------------------------------------------------------
 resource "snowflake_warehouse" "compute_wh" {
-  name           = var.warehouse_name
-  warehouse_size = "xsmall"
-  auto_suspend   = 60
-  auto_resume    = true
+  name                = var.warehouse_name
+  warehouse_size      = "xsmall"
+  auto_suspend        = 60
+  auto_resume         = true
   initially_suspended = true
-  comment        = "Compute warehouse for dbt models and raw ingestion orchestration."
+  comment             = "Compute warehouse for dbt models and raw ingestion orchestration."
 }
 
 # ---------------------------------------------------------------------------------------------------------------------
