@@ -2,12 +2,20 @@
     config(
         materialized='incremental',
         unique_key='event_key',
-        on_schema_change='append_new_columns'
+        on_schema_change='append_new_columns',
+        cluster_by=['event_date', 'user_id']
     )
 }}
 
 with joined_events as (
     select * from {{ ref('int_events_joined') }}
+    {% if is_incremental() %}
+        {% if target.type == 'snowflake' %}
+            where event_timestamp >= (select dateadd('day', -3, coalesce(max(event_timestamp), '1970-01-01'::timestamp)) from {{ this }})
+        {% else %}
+            where event_timestamp >= (select coalesce(max(event_timestamp), timestamp '1970-01-01') - interval '3 days' from {{ this }})
+        {% endif %}
+    {% endif %}
 ),
 
 final_fct_events as (
@@ -26,7 +34,3 @@ final_fct_events as (
 )
 
 select * from final_fct_events
-
-{% if is_incremental() %}
-    where event_timestamp > (select max(event_timestamp) from {{ this }})
-{% endif %}

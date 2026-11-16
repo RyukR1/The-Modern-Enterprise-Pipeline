@@ -8,6 +8,14 @@ sources:
     tables:
       - name: raw_events
         description: "Raw events JSON table."
+        loaded_at_field: ingested_at
+        freshness:
+          warn_after:
+            count: 12
+            period: hour
+          error_after:
+            count: 24
+            period: hour
         columns:
           - name: raw_payload
             description: "JSON variant column holding event payload."
@@ -16,6 +24,14 @@ sources:
 
       - name: raw_users
         description: "Raw users JSON table."
+        loaded_at_field: ingested_at
+        freshness:
+          warn_after:
+            count: 12
+            period: hour
+          error_after:
+            count: 24
+            period: hour
         columns:
           - name: raw_payload
             description: "JSON variant column holding user payload."
