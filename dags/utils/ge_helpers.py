@@ -20,7 +20,6 @@ def run_great_expectations_checkpoint(
         return {"success": True, "details": "Local mock validation passed."}
 
     try:
-        import great_expectations as ge
         from great_expectations.data_context import DataContext
 
         context = DataContext(ge_root_dir)

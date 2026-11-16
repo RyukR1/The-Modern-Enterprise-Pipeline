@@ -7,7 +7,7 @@ from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 
 from dags.utils.api_client import APIClient
 from dags.utils.snowflake_hooks import SnowflakeStageLoader
-from dags.utils.alert_callbacks import slack_failure_callback, discord_failure_callback
+from dags.utils.alert_callbacks import slack_failure_callback
 
 logger = logging.getLogger(__name__)
 

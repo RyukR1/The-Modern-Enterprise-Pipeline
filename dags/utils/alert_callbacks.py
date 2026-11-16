@@ -23,7 +23,7 @@ def slack_failure_callback(context: Dict[str, Any]) -> None:
     exception = context.get("exception")
 
     message = {
-        "text": f"🚨 *Airflow Task Failure Alert* 🚨",
+        "text": "🚨 *Airflow Task Failure Alert* 🚨",
         "attachments": [
             {
                 "color": "#E01E5A",
@@ -96,7 +96,7 @@ def sla_miss_callback(dag, task_list, blocking_task_list, slas, blocking_tis) ->
     """
     dag_id = dag.dag_id if dag else "Unknown DAG"
     message_text = f"⏰ *Airflow SLA Miss Alert* - DAG: `{dag_id}` | Tasks: `{task_list}` | Blocking: `{blocking_task_list}`"
-    
+
     # Send Slack alert if configured
     slack_url = os.getenv("SLACK_WEBHOOK_URL")
     if slack_url:

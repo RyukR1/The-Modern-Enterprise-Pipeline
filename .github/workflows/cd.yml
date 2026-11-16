@@ -1,12 +1,16 @@
-name: CD Pipeline (Deployment Checks)
+name: CD Pipeline (Production Delivery)
 
 on:
   push:
     branches: [ main ]
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   deploy-validation:
-    name: Production Deployment Validation
+    name: Production dbt Artifacts & Manifest Validation
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -22,7 +26,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install dbt-core dbt-duckdb dbt-snowflake
 
-      - name: Parse & Validate dbt Manifest
+      - name: Generate & Validate dbt Production Manifest
         env:
           DBT_PROFILES_DIR: ${{ github.workspace }}/dbt_project
         run: |
@@ -30,6 +34,51 @@ jobs:
           dbt deps
           dbt parse --target dev
           echo "dbt manifest parsed successfully. Artifacts ready for deployment."
+
+      - name: Upload Manifest Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbt-production-manifest
+          path: dbt_project/target/manifest.json
+          retention-days: 7
+
+  build-and-publish-container:
+    name: Build & Publish Release Image to GHCR
+    runs-on: ubuntu-latest
+    needs: deploy-validation
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Metadata (Tags, Labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=latest
+            type=sha,format=short
+
+      - name: Build and Push Docker Release Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Notify Deployment Status
         if: always()

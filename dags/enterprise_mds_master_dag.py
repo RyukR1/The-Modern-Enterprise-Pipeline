@@ -8,7 +8,7 @@ from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 
 from dags.utils.api_client import APIClient
 from dags.utils.snowflake_hooks import SnowflakeStageLoader
-from dags.utils.alert_callbacks import slack_failure_callback, discord_failure_callback, sla_miss_callback
+from dags.utils.alert_callbacks import slack_failure_callback, sla_miss_callback
 from dags.utils.ge_helpers import run_great_expectations_checkpoint
 
 logger = logging.getLogger(__name__)
@@ -45,10 +45,10 @@ with DAG(
     def task_1_ingest_to_s3(**kwargs):
         execution_date = kwargs.get("ds", datetime.utcnow().strftime("%Y-%m-%d"))
         dt = datetime.strptime(execution_date, "%Y-%m-%d")
-        
+
         # Partition path structure: year=YYYY/month=MM/day=DD
         partition_path = f"year={dt.year:04d}/month={dt.month:02d}/day={dt.day:02d}"
-        
+
         api_url = os.getenv("API_BASE_URL", "https://api.github.com")
         client = APIClient(base_url=api_url)
 

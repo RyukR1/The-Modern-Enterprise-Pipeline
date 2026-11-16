@@ -6,9 +6,13 @@ on:
   pull_request:
     branches: [ main, develop ]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  lint-and-test:
-    name: Lint & Unit Tests
+  lint-and-unit-tests:
+    name: Lint, Test & DAG Integrity
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -23,9 +27,13 @@ jobs:
       - name: Install CI Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install dbt-core dbt-duckdb dbt-snowflake pytest responses sqlfluff sqlfluff-templater-dbt requests urllib3 boto3
+          pip install dbt-core dbt-duckdb dbt-snowflake pytest responses sqlfluff sqlfluff-templater-dbt requests urllib3 boto3 ruff
 
-      - name: Run Pytest (DAG Integrity & Python Unit Tests)
+      - name: Python Code Linting (Ruff)
+        run: |
+          ruff check dags/ tests/
+
+      - name: Run Pytest (DAG Integrity & Unit Tests)
         env:
           AIRFLOW__CORE__DAGS_FOLDER: ${{ github.workspace }}/dags
         run: |
@@ -33,10 +41,10 @@ jobs:
 
       - name: Run SQLFluff Linting on dbt models
         run: |
-          sqlfluff lint dbt_project/models --dialect duckdb --ignore parsing,templating || true
+          sqlfluff lint dbt_project/models --dialect duckdb --ignore parsing,templating
 
-  dbt-compile:
-    name: dbt Compile Check
+  dbt-validation:
+    name: dbt Compile & Catalog Validation
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -46,16 +54,70 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+          cache: 'pip'
 
       - name: Install dbt & Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install dbt-core dbt-duckdb dbt-snowflake
 
-      - name: dbt Debug & Compile
+      - name: dbt Dependencies & Compile Check
         env:
           DBT_PROFILES_DIR: ${{ github.workspace }}/dbt_project
         run: |
           cd dbt_project
           dbt deps
           dbt compile --target dev
+
+  terraform-lint:
+    name: Terraform Validate & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.0
+
+      - name: Check Terraform Formatting
+        run: |
+          terraform fmt -check -recursive terraform/
+
+  docker-build-and-security:
+    name: Docker Build & DevSecOps Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Lint Dockerfile (Hadolint)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+          failure-threshold: error
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Container Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          load: true
+          tags: enterprise-mds-airflow:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Container Vulnerability Scan (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'enterprise-mds-airflow:test'
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'

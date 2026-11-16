@@ -17,7 +17,7 @@ def test_dag_import_errors(dag_path):
         return
 
     try:
-        import airflow
+        import airflow  # noqa: F401
     except ImportError:
         pytest.skip("Airflow is not installed in the local environment.")
 

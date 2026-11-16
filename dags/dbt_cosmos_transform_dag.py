@@ -20,8 +20,7 @@ default_args = {
 
 try:
     # Attempt to import Astronomer Cosmos for native dbt DAG orchestration
-    from cosmos import DbtTaskGroup, ProjectConfig, ProfileConfig, ExecutionConfig
-    from cosmos.profiles import SnowflakeUserPasswordProfileMapping, DuckDBUserPasswordProfileMapping
+    from cosmos import DbtTaskGroup, ExecutionConfig, ProfileConfig, ProjectConfig
 
     HAS_COSMOS = True
 except ImportError:
