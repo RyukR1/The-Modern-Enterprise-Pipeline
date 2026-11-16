@@ -1,39 +1,42 @@
 # Enterprise Modern Data Stack (MDS) Pipeline
 
-[![CI Pipeline](https://github.com/enterprise/mds-pipeline/actions/workflows/ci.yml/badge.svg)](https.github.com)
-[![dbt Version](https://img.shields.io/badge/dbt-v1.7.0-orange.svg)](https://getdbt.com)
+[![CI Pipeline](https://github.com/enterprise/mds-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/enterprise/mds-pipeline/actions/workflows/ci.yml)
+[![CD Pipeline](https://github.com/enterprise/mds-pipeline/actions/workflows/cd.yml/badge.svg)](https://github.com/enterprise/mds-pipeline/actions/workflows/cd.yml)
+[![dbt Version](https://img.shields.io/badge/dbt-v1.7+-orange.svg)](https://getdbt.com)
 [![Airflow Version](https://img.shields.io/badge/Airflow-v2.8.1-blue.svg)](https://airflow.apache.org)
+[![Terraform](https://img.shields.io/badge/IaC-Terraform-blueviolet.svg)](https://www.terraform.io)
+[![Observability](https://img.shields.io/badge/Monitoring-Prometheus%20%2B%20Grafana-red.svg)](https://grafana.com)
 
-An enterprise-grade, end-to-end data pipeline implementing the **Modern Data Stack architecture**. This project ingests raw REST API payloads, lands data in Object Storage (S3/MinIO), stages records into **Snowflake Data Warehouse**, transforms raw variant JSON into Medallion architecture layers (**Bronze, Silver, Gold Kimball Star Schema**) via **dbt**, and orchestrates workflows using **Apache Airflow & Astronomer Cosmos**.
+An enterprise-grade, end-to-end data platform implementing the **Modern Data Stack architecture** with production-grade **DevOps, DevSecOps, SRE, and Infrastructure as Code (IaC)**.
+
+This platform ingests raw REST API payloads, stages records into an encrypted **AWS S3 / MinIO** data lake, loads data into **Snowflake Data Warehouse**, transforms raw variant JSON into Medallion architecture layers (**Bronze, Silver, Gold Kimball Star Schema**) via **dbt**, and orchestrates workflows using **Apache Airflow & Astronomer Cosmos** with real-time operational telemetry.
 
 ---
 
-## 🏗 Architecture & Data Flow
+## 🏗 Architecture & DevOps Data Flow
 
 ```mermaid
 flowchart LR
-    subgraph Ingestion["1. Extraction & Landing"]
+    subgraph IaC["1. Infrastructure as Code (Terraform)"]
+        TF_AWS["AWS S3 & IAM Module"]
+        TF_SNOW["Snowflake DB & RBAC Module"]
+    end
+
+    subgraph Ingestion["2. Extraction & Landing"]
         API["REST API"] -->|APIClient + Rate Limit| DAG1["raw_api_ingestion_dag"]
-        DAG1 -->|NDJSON Payload| S3["S3 / MinIO (raw-data)"]
+        DAG1 -->|NDJSON Payload| S3["Encrypted S3 / MinIO Data Lake"]
     end
 
-    subgraph DataWarehouse["2. Snowflake Data Warehouse"]
+    subgraph DataWarehouse["3. Snowflake Warehouse & Transformations"]
         S3 -->|COPY INTO| RAW["BRONZE Layer (RAW JSON)"]
+        RAW -->|dbt + Cosmos| SIL["SILVER Layer (Deduplicated)"]
+        SIL -->|dbt + Cosmos| GOLD["GOLD Layer (Kimball Star Schema)"]
     end
 
-    subgraph Transformations["3. dbt & Cosmos Transformations"]
-        RAW -->|stg_events / stg_users| STG["BRONZE (Parsed Views)"]
-        STG -->|int_events_cleaned| SIL["SILVER (Deduplicated)"]
-        SIL -->|int_events_joined| ENR["SILVER (Enriched Events)"]
-        ENR -->|Kimball Star Schema| GOLD["GOLD (dim_users, dim_dates, fct_events)"]
-        STG -->|snap_users| SNAP["SCD Type-2 Snapshots"]
-    end
-
-    subgraph Quality["4. Orchestration & Governance"]
-        Airflow["Apache Airflow + Cosmos"] --> DAG1
-        Airflow -->|DbtTaskGroup| Transformations
-        SQLFluff["SQLFluff"] -.-> Transformations
-        GE["Great Expectations"] -.-> S3
+    subgraph DevOps["4. CI/CD & Observability (SRE)"]
+        GHA["GitHub Actions CI/CD (Hadolint + Trivy + GHCR)"]
+        StatsD["Airflow StatsD Exporter"] --> Prom["Prometheus (Port 9090)"]
+        Prom --> Graf["Grafana Dashboard (Port 3000)"]
     end
 ```
 
@@ -45,8 +48,8 @@ flowchart LR
 enterprise-mds-pipeline/
 ├── .github/
 │   └── workflows/
-│       ├── ci.yml                 # Runs pytest, sqlfluff, and dbt compile on PRs
-│       └── cd.yml                 # Deployment / linting checks
+│       ├── ci.yml                 # CI: Ruff, Pytest, SQLFluff, Hadolint, Docker build & Trivy scan
+│       └── cd.yml                 # CD: dbt manifest validation & GHCR image publishing on merge
 │
 ├── dags/
 │   ├── __init__.py
@@ -62,58 +65,39 @@ enterprise-mds-pipeline/
 │   ├── dbt_project.yml            # Main dbt configuration file
 │   ├── packages.yml               # dbt external dependencies (e.g., dbt-utils, dbt-expectations)
 │   ├── profiles.yml               # Warehouse connection profile (Snowflake / DuckDB)
-│   │
-│   ├── macros/
-│   │   ├── generate_surrogate_key.sql
-│   │   └── audit_metadata.sql     # Custom Jinja macros for load metadata
-│   │
-│   ├── models/
-│   │   ├── staging/               # BRONZE LAYER: Views casting raw JSON
-│   │   │   ├── src_external_api.yml
-│   │   │   ├── stg_events.sql
-│   │   │   └── stg_users.sql
-│   │   │
-│   │   ├── intermediate/          # SILVER LAYER: Deduplicated & cleansed tables
-│   │   │   ├── int_events_cleaned.sql
-│   │   │   └── int_events_joined.sql
-│   │   │
-│   │   └── marts/                 # GOLD LAYER: Kimball Star Schema
-│   │       ├── core/
-│   │       │   ├── schema.yml     # Data contracts and integrity tests
-│   │       │   ├── dim_users.sql  # Dimension Table
-│   │       │   ├── dim_dates.sql  # Date/Time Dimension Table
-│   │       │   └── fct_events.sql # Incremental Fact Table
-│   │
-│   ├── snapshots/                 # SCD Type-2 tracking
-│   │   └── snap_users.sql
-│   │
-│   └── tests/                     # Custom singular/business logic SQL tests
-│       └── assert_positive_metrics.sql
+│   ├── models/                    # Bronze, Silver, Gold Kimball models
+│   └── tests/                     # Custom SQL integrity tests
 │
-├── great_expectations/            # Data Quality Checkpoints
-│   ├── great_expectations.yml
-│   ├── checkpoints/
-│   │   └── raw_payload_checkpoint.yml
-│   └── expectations/
-│       └── raw_api_suite.json
+├── terraform/                     # Declarative Infrastructure as Code (IaC)
+│   ├── aws/                       # AWS S3 Data Lake (AES256, versioning, Glacier lifecycle) & IAM roles
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   └── outputs.tf
+│   └── snowflake/                 # Snowflake Warehouses, DBs, Schemas & RBAC
+│       ├── main.tf
+│       ├── variables.tf
+│       └── outputs.tf
 │
-├── sql/
-│   └── ddl/
-│       ├── 01_init_snowflake_db.sql # Sets up Warehouses, DBs, Roles, and Schemas
-│       └── 02_create_stages.sql     # External stage pointing to S3/MinIO
+├── monitoring/                    # Observability & Site Reliability Engineering (SRE)
+│   ├── statsd-exporter/           # StatsD mapping configuration for Airflow metrics
+│   │   └── statsd.mapping.yml
+│   ├── prometheus/                # Scrape targets and metric retention configs
+│   │   └── prometheus.yml
+│   └── grafana/                   # Automated datasource and dashboard provisioning
+│       ├── provisioning/
+│       └── dashboards/airflow_overview.json
 │
-├── tests/                         # Unit tests for custom ingestion scripts
-│   ├── __init__.py
+├── tests/                         # Unit tests for custom ingestion scripts and DAG integrity
 │   ├── test_api_client.py
-│   └── test_dag_integrity.py      # Checks Airflow DAGs for import errors and cycles
+│   └── test_dag_integrity.py
 │
 ├── .env.example                   # Environment variable template (keys, DB creds)
-├── .gitignore
-├── .sqlfluff                      # SQLFluff config for consistent dbt SQL linting
-├── Dockerfile                     # Custom Airflow image with dbt & Python dependencies
-├── docker-compose.yml             # Airflow Webserver, Scheduler, Postgres, MinIO
-├── Makefile                       # Quick CLI targets (make up, make dbt-run, make test)
-├── README.md                      # Architecture diagram, setup guide, and tech details
+├── .pre-commit-config.yaml        # Local Git hook validation (ruff, black, check-yaml)
+├── .sqlfluff                      # SQLFluff config for dbt SQL linting
+├── Dockerfile                     # OCI-compliant Airflow image with dbt & Python dependencies
+├── docker-compose.yml             # Orchestration stack: Airflow, Postgres, MinIO, Prometheus, Grafana
+├── Makefile                       # Developer & DevOps CLI targets
+├── pyproject.toml                 # Linter configuration (Ruff)
 └── requirements.txt               # astronomer-cosmos, dbt-snowflake, boto3, etc.
 ```
 
@@ -122,9 +106,9 @@ enterprise-mds-pipeline/
 ## ⚡ Quickstart & Setup Guide
 
 ### 1. Prerequisites
-- **Docker Desktop** (version 20+ with Docker Compose v2)
+- **Docker & Docker Compose** (version 20.10+ / Compose v2)
 - **Python 3.10+**
-- (Optional) **Snowflake Account** for cloud target deployment
+- (Optional) **AWS CLI** and **Terraform 1.5+** for cloud provisioning
 
 ### 2. Environment Configuration
 Copy the `.env.example` template to `.env`:
@@ -132,31 +116,32 @@ Copy the `.env.example` template to `.env`:
 cp .env.example .env
 ```
 
-### 3. Launch Local Pipeline Infrastructure
-Start Postgres, Airflow Webserver, Airflow Scheduler, and MinIO S3 emulator:
+### 3. Launch Local Pipeline & Observability Infrastructure
+Start PostgreSQL, Airflow Webserver, Airflow Scheduler, MinIO, StatsD Exporter, Prometheus, and Grafana:
 ```bash
 make up
 ```
+
 Access services locally:
 - **Airflow UI**: [http://localhost:8080](http://localhost:8080) (`admin` / `admin`)
 - **MinIO Console**: [http://localhost:9001](http://localhost:9001) (`minioadmin` / `minioadmin`)
+- **Prometheus UI**: [http://localhost:9090](http://localhost:9090)
+- **Grafana SRE Dashboard**: [http://localhost:3000](http://localhost:3000) (`admin` / `admin`)
 
 ---
 
-## 🧪 Testing & Data Quality Verification
+## 🧪 Testing, Linting & Code Quality
 
-### Run Python Unit & DAG Integrity Tests
+Run tests and linters locally with the provided Makefile:
+
 ```bash
+# Run Python unit tests and Airflow DAG integrity checks
 make test
-```
 
-### Run SQLFluff Linter on dbt SQL Models
-```bash
+# Run code style & formatting checks (Ruff + SQLFluff)
 make lint
-```
 
-### Execute dbt Transformations Locally (DuckDB Target)
-```bash
+# Run dbt transformations & data quality tests (DuckDB dev engine)
 make dbt-deps
 make dbt-run
 make dbt-test
@@ -164,10 +149,40 @@ make dbt-test
 
 ---
 
-## 🚀 CI/CD Pipeline
+## 🚀 CI/CD & DevSecOps Pipeline
 
-- **Continuous Integration (`.github/workflows/ci.yml`)**: Triggered on PRs. Runs `pytest` DAG validation, `sqlfluff` linting, and `dbt compile` against DuckDB.
-- **Continuous Deployment (`.github/workflows/cd.yml`)**: Triggered on merge to `main`. Validates dbt manifest artifacts for production release.
+The repository includes enterprise-grade GitHub Actions workflows:
+
+1. **Continuous Integration (`.github/workflows/ci.yml`)**:
+   - **Static Code Analysis**: Checks code formatting and bugs with `ruff`.
+   - **DAG Validation & Unit Testing**: Runs DAG integrity and API client unit tests via `pytest`.
+   - **SQL Model Quality**: Lints dbt models against `sqlfluff`.
+   - **IaC Formatting**: Enforces `terraform fmt` across all Terraform modules.
+   - **Container Security & Linting (DevSecOps)**:
+     - Lints `Dockerfile` with **Hadolint**.
+     - Builds Docker container image with layer caching.
+     - Scans image for High/Critical CVEs using **Aqua Security Trivy**.
+
+2. **Continuous Deployment (`.github/workflows/cd.yml`)**:
+   - Triggers on merge to `main`.
+   - Parses and validates dbt production manifest artifacts.
+   - Builds and publishes the release image to **GitHub Container Registry (`ghcr.io`)** tagged with `latest` and commit SHA.
+
+---
+
+## 🌐 Infrastructure as Code (Terraform)
+
+Infrastructure is codified declaratively under `terraform/`:
+
+- **AWS Module (`terraform/aws/`)**:
+  - Encrypted, versioned S3 bucket for raw data-lake ingestion.
+  - S3 lifecycle rule auto-transitioning raw JSON payloads to **AWS Glacier** after 90 days.
+  - Public access block preventing accidental exposure.
+  - Least-privilege IAM policies and roles for Airflow worker instances.
+- **Snowflake Module (`terraform/snowflake/`)**:
+  - Declarative compute warehouse (`COMPUTE_WH`) with auto-suspend and auto-resume.
+  - Medallion databases and schemas (`RAW`, `STAGING`, `ANALYTICS`).
+  - RBAC roles (`DATA_ENGINEER`) with scoped permissions.
 
 ---
 

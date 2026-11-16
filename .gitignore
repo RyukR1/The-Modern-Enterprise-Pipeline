@@ -54,3 +54,12 @@ great_expectations/uncommitted/
 
 # Temporary ingestion files
 /tmp/ingestion/
+
+# dbt local user config
+dbt_project/.user.yml
+
+# Terraform local cache and state
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log

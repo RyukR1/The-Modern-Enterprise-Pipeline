@@ -1,0 +1,26 @@
+mappings:
+  - match: "airflow.dag.*.*.duration"
+    name: "airflow_dag_task_duration_seconds"
+    labels:
+      dag_id: "$1"
+      task_id: "$2"
+
+  - match: "airflow.dag.*.*.success"
+    name: "airflow_dag_task_success_total"
+    labels:
+      dag_id: "$1"
+      task_id: "$2"
+
+  - match: "airflow.dag.*.*.failure"
+    name: "airflow_dag_task_failure_total"
+    labels:
+      dag_id: "$1"
+      task_id: "$2"
+
+  - match: "airflow.dag_processing.last_duration.*"
+    name: "airflow_dag_processing_duration_seconds"
+    labels:
+      dag_file: "$1"
+
+  - match: "airflow.scheduler.heartbeat"
+    name: "airflow_scheduler_heartbeat_total"

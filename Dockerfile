@@ -1,8 +1,14 @@
+# syntax=docker/dockerfile:1
 FROM apache/airflow:2.8.1-python3.10
+
+LABEL maintainer="Enterprise Platform Team" \
+      org.opencontainers.image.title="Enterprise Modern Data Stack Orchestration Image" \
+      org.opencontainers.image.description="Custom Apache Airflow image equipped with dbt, Astronomer Cosmos, and Cloud connectors." \
+      org.opencontainers.image.source="https://github.com/enterprise/mds-pipeline"
 
 USER root
 
-# Install system utilities & build toolchain
+# Install system utilities and database client libraries with cleanup to reduce image size
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         build-essential \
@@ -10,15 +16,16 @@ RUN apt-get update \
         curl \
         libpq-dev \
     && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 USER airflow
 
-# Copy requirements and install python packages
-COPY requirements.txt /requirements.txt
+# Upgrade pip & install Python dependencies
+COPY --chown=airflow:root requirements.txt /requirements.txt
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r /requirements.txt
 
-# Environment variables for dbt execution
-ENV DBT_PROJECT_PATH=/usr/local/airflow/dbt_project
-ENV DBT_PROFILES_DIR=/usr/local/airflow/dbt_project
+# Environment configuration for dbt and Astro Cosmos execution
+ENV DBT_PROJECT_PATH=/opt/airflow/dbt_project \
+    DBT_PROFILES_DIR=/opt/airflow/dbt_project \
+    PYTHONUNBUFFERED=1
