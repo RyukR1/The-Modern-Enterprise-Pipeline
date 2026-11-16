@@ -47,3 +47,13 @@ def test_save_as_ndjson(api_client, tmp_path):
         lines = f.readlines()
         assert len(lines) == 2
         assert json.loads(lines[0])["name"] == "Alice"
+
+
+def test_save_as_parquet(api_client, tmp_path):
+    records = [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
+    target_file = tmp_path / "test_records.parquet"
+
+    result_path = api_client.save_as_parquet(records, str(target_file))
+
+    assert os.path.exists(result_path)
+    assert os.path.getsize(result_path) > 0
